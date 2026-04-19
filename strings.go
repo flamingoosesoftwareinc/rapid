@@ -65,6 +65,28 @@ var (
 	anyRuneGenNoNL = Rune().Filter(func(r rune) bool { return r != '\n' })
 )
 
+// ClearGenCaches drops rapid's package-level caches for derived string
+// generators: compiled regexps, expanded rune tables, named character
+// classes. Useful in long-running test processes that feed a large number
+// of distinct patterns to [StringMatching] / [RuneFrom], where cache
+// entries accumulate and can't be reclaimed (the caches are unbounded
+// sync.Maps keyed by regex-pattern strings and *unicode.RangeTable
+// pointers).
+//
+// Clearing is safe concurrently with Draw calls: worst case is duplicate
+// work as readers miss the cache and recompile. Existing Generator values
+// already constructed remain valid — the cache only affects future
+// StringMatching / RuneFrom invocations.
+//
+// Prefer calling between independent test runs, not inside a tight Draw
+// loop: clearing and rebuilding per draw trades memory for CPU.
+func ClearGenCaches() {
+	expandedTables.Clear()
+	compiledRegexps.Clear()
+	regexpNames.Clear()
+	charClassGens.Clear()
+}
+
 type compiledRegexp struct {
 	syn *syntax.Regexp
 	re  *regexp.Regexp
