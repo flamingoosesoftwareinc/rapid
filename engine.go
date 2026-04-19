@@ -29,7 +29,6 @@ import (
 const (
 	small             = 5
 	invalidChecksMult = 10
-	exampleMaxTries   = 1000
 
 	maxTestTimeout  = 24 * time.Hour
 	shrinkStepBound = 10 * time.Second // can be improved by taking average checkOnce runtime into account
@@ -46,7 +45,30 @@ var (
 		"pgregory.net/rapid.(*customGen[...]).maybeValue.func1": true,
 		"pgregory.net/rapid.runAction.func1":                    true,
 	}
+
+	// exampleMaxTries is the retry budget for [Generator.Example]. Each
+	// try runs the full generator; if it panics with invalidData the
+	// loop retries. Default 1000 is reasonable for normal use but
+	// amplifies allocation catastrophically when a generator panics
+	// deterministically (see SetExampleMaxTries).
+	exampleMaxTries = 1000
 )
+
+// SetExampleMaxTries changes the retry budget for [Generator.Example] at
+// a process-wide level. Useful for long-running test harnesses that feed
+// many distinct (and occasionally pathological) schemas through the same
+// generator: if a generator panics deterministically, the default 1000
+// retries re-execute the whole body pipeline 1000 times and allocate
+// proportionally. Lowering to e.g. 10 caps the amplification at the
+// cost of giving up faster on genuinely hard-to-satisfy generators.
+//
+// n must be > 0; values <= 0 are ignored. Not safe to call concurrently
+// with in-flight Example calls (would race on the read).
+func SetExampleMaxTries(n int) {
+	if n > 0 {
+		exampleMaxTries = n
+	}
+}
 
 type cmdline struct {
 	checks     int
