@@ -90,6 +90,15 @@ func (g *Generator[V]) Example(seed ...int) V {
 	return v
 }
 
+// NewSeededT creates a *T backed by a deterministic RNG with no testing
+// context. Values drawn from this T are reproducible given the same seed
+// but are not shrinkable. Use this to call rapid generators from non-test
+// code (mock servers, CLI tools) where property-based shrinking is not
+// needed.
+func NewSeededT(seed uint64) *T {
+	return newT(nil, newRandomBitStream(seed, false), false, nil)
+}
+
 // Filter creates a generator producing only values from g for which fn returns true.
 func (g *Generator[V]) Filter(fn func(V) bool) *Generator[V] {
 	return filter(g, fn)
