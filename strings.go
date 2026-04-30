@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"regexp/syntax"
 	"strings"
@@ -256,6 +257,26 @@ func StringMatching(expr string) *Generator[string] {
 	})
 }
 
+// StringMatchingWithRunes creates a UTF-8 string generator matching the
+// provided [syntax.Perl] regular expression, restricting generated
+// characters to the given rune range tables. Characters drawn from broad
+// classes like [^:] or . are filtered to only include runes in the
+// allowed set. This prevents generating control characters and other
+// semantically invalid output from permissive patterns.
+func StringMatchingWithRunes(expr string, allowed ...*unicode.RangeTable) *Generator[string] {
+	compiled, err := compileRegexp(expr)
+	assertf(err == nil, "%v", err)
+
+	return newGenerator[string](&regexpStringGen{
+		regexpGen{
+			expr:         expr,
+			syn:          compiled.syn,
+			re:           compiled.re,
+			allowedRunes: allowed,
+		},
+	})
+}
+
 // SliceOfBytesMatching creates a UTF-8 byte slice generator matching the provided [syntax.Perl] regular expression.
 func SliceOfBytesMatching(expr string) *Generator[[]byte] {
 	compiled, err := compileRegexp(expr)
@@ -275,9 +296,10 @@ type runeWriter interface {
 }
 
 type regexpGen struct {
-	expr string
-	syn  *syntax.Regexp
-	re   *regexp.Regexp
+	expr         string
+	syn          *syntax.Regexp
+	re           *regexp.Regexp
+	allowedRunes []*unicode.RangeTable // nil = unrestricted
 }
 type regexpStringGen struct{ regexpGen }
 type regexpSliceGen struct{ regexpGen }
@@ -297,9 +319,17 @@ func (g *regexpStringGen) maybeString(t *T) (string, bool) {
 	if g.re.MatchString(v) {
 		return v, true
 	} else {
+		if debugRegexp {
+			fmt.Fprintf(debugWriter, "maybeString FAIL: expr=%q generated=%q\n", g.expr, v)
+		}
+
 		return "", false
 	}
 }
+
+// debugRegexp can be set to true to log regex generation failures.
+var debugRegexp bool
+var debugWriter = os.Stderr
 
 func (g *regexpSliceGen) maybeSlice(t *T) ([]byte, bool) {
 	b := &bytes.Buffer{}
@@ -334,13 +364,21 @@ func (g *regexpGen) build(w runeWriter, re *syntax.Regexp, t *T) {
 			_, _ = w.WriteRune(maybeFoldCase(t.s, r, re.Flags))
 		}
 	case syntax.OpCharClass, syntax.OpAnyCharNotNL, syntax.OpAnyChar:
-		sub := anyRuneGen
-		switch re.Op {
-		case syntax.OpCharClass:
-			sub = charClassGen(re)
-		case syntax.OpAnyCharNotNL:
-			sub = anyRuneGenNoNL
+		var sub *Generator[rune]
+
+		if len(g.allowedRunes) > 0 {
+			sub = g.restrictedRuneGen(re)
+		} else {
+			switch re.Op {
+			case syntax.OpCharClass:
+				sub = charClassGen(re)
+			case syntax.OpAnyCharNotNL:
+				sub = anyRuneGenNoNL
+			default:
+				sub = anyRuneGen
+			}
 		}
+
 		r := sub.value(t)
 		_, _ = w.WriteRune(maybeFoldCase(t.s, r, re.Flags))
 	case syntax.OpBeginLine, syntax.OpEndLine,
@@ -388,6 +426,30 @@ func maybeFoldCase(s bitStream, r rune, flags syntax.Flags) rune {
 	}
 
 	return r
+}
+
+func expandRangeTableNoCache(t *unicode.RangeTable) []rune {
+	n := 0
+	for _, r := range t.R16 {
+		n += int(r.Hi-r.Lo)/int(r.Stride) + 1
+	}
+	for _, r := range t.R32 {
+		n += int(r.Hi-r.Lo)/int(r.Stride) + 1
+	}
+
+	ret := make([]rune, 0, n)
+	for _, r := range t.R16 {
+		for i := uint32(r.Lo); i <= uint32(r.Hi); i += uint32(r.Stride) {
+			ret = append(ret, rune(i))
+		}
+	}
+	for _, r := range t.R32 {
+		for i := uint64(r.Lo); i <= uint64(r.Hi); i += uint64(r.Stride) {
+			ret = append(ret, rune(i))
+		}
+	}
+
+	return ret
 }
 
 func expandRangeTable(t *unicode.RangeTable, key any) []rune {
@@ -452,6 +514,68 @@ func regexpName(re *syntax.Regexp) string {
 	regexpNames.Store(re, s)
 
 	return s
+}
+
+// restrictedRuneGen builds a rune generator from the intersection of the
+// regex character class and the allowed rune ranges. No rejection sampling —
+// the generator only produces runes that satisfy both constraints.
+func (g *regexpGen) restrictedRuneGen(re *syntax.Regexp) *Generator[rune] {
+	// Build the set of runes allowed by the regex.
+	var regexRunes []rune
+
+	switch re.Op {
+	case syntax.OpCharClass:
+		// re.Rune is pairs of [lo, hi] ranges.
+		t := &unicode.RangeTable{R32: make([]unicode.Range32, 0, len(re.Rune)/2)}
+		for i := 0; i < len(re.Rune); i += 2 {
+			t.R32 = append(t.R32, unicode.Range32{
+				Lo:     uint32(re.Rune[i]),
+				Hi:     uint32(re.Rune[i+1]),
+				Stride: 1,
+			})
+		}
+
+		regexRunes = expandRangeTableNoCache(t)
+	case syntax.OpAnyCharNotNL:
+		// All runes except \n — just use the allowed set directly,
+		// excluding \n.
+		for _, tbl := range g.allowedRunes {
+			for _, r := range expandRangeTable(tbl, nil) {
+				if r != '\n' {
+					regexRunes = append(regexRunes, r)
+				}
+			}
+		}
+
+		return runesFrom(false, regexRunes)
+	case syntax.OpAnyChar:
+		// All runes — just use the allowed set directly.
+		for _, tbl := range g.allowedRunes {
+			regexRunes = append(regexRunes, expandRangeTable(tbl, nil)...)
+		}
+
+		return runesFrom(false, regexRunes)
+	default:
+		return anyRuneGen
+	}
+
+	// Intersect: keep only runes that are in both the regex class and the
+	// allowed set.
+	var intersected []rune
+
+	for _, r := range regexRunes {
+		if unicode.IsOneOf(g.allowedRunes, r) {
+			intersected = append(intersected, r)
+		}
+	}
+
+	if len(intersected) == 0 {
+		// No intersection — fall back to the regex class. Better to
+		// produce a technically-matching value than panic.
+		intersected = regexRunes
+	}
+
+	return runesFrom(false, intersected)
 }
 
 func charClassGen(re *syntax.Regexp) *Generator[rune] {
