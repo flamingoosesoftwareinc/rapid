@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 type privateFields struct {
