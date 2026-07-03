@@ -1,0 +1,43 @@
+name: fork-sync
+
+# Rebase our patches on upstream, verify (build+test) both the patches branch
+# and the generated release, then publish. On failure (conflict or broken
+# test) the run fails for a human/agent to resolve the small patch conflict.
+# Reusable across forks — all specifics live in .fork/config.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Configure git
+        run: |
+          git config user.name  "fork-sync[bot]"
+          git config user.email "fork-sync@users.noreply.github.com"
+      - name: Rebase patches on upstream
+        run: make rebase
+      - name: Verify patches (build + test)
+        run: make verify
+      - name: Regenerate and verify release
+        run: |
+          make release
+          git checkout release
+          make verify-release
+      - name: Publish
+        run: |
+          . ./.fork/config
+          git push --force-with-lease origin "$UPSTREAM_BRANCH"
+          git push --force origin release

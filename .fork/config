@@ -1,0 +1,5 @@
+OLD=pgregory.net/rapid
+NEW=github.com/flamingoosesoftwareinc/rapid
+UPSTREAM_URL=https://github.com/flyingmutant/rapid.git
+UPSTREAM_BRANCH=master
+DEPS=
