@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"testing"
 
-	. "pgregory.net/rapid"
+	. "github.com/flamingoosesoftwareinc/rapid"
 )
 
 type testStruct struct {

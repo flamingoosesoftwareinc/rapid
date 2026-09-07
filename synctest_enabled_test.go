@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 func TestSyncTest(t *testing.T) {

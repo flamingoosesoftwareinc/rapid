@@ -1,3 +1,3 @@
-module pgregory.net/rapid
+module github.com/flamingoosesoftwareinc/rapid
 
 go 1.23

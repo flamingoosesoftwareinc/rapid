@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"testing"
 
-	. "pgregory.net/rapid"
+	. "github.com/flamingoosesoftwareinc/rapid"
 )
 
 // Based on https://github.com/rust-lang/regex/blob/master/tests/crates_regex.rs

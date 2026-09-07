@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"unicode"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 func ExampleRune() {
