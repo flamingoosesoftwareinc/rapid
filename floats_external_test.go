@@ -11,7 +11,7 @@ import (
 	"sort"
 	"testing"
 
-	. "pgregory.net/rapid"
+	. "github.com/flamingoosesoftwareinc/rapid"
 )
 
 func TestFloatNoInf(t *testing.T) {

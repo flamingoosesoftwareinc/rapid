@@ -10,7 +10,7 @@ import (
 	"math"
 	"testing"
 
-	. "pgregory.net/rapid"
+	. "github.com/flamingoosesoftwareinc/rapid"
 )
 
 // wrapper to test (*T).Helper()
