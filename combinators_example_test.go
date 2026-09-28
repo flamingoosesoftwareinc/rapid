@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 func ExampleCustom() {
