@@ -10,7 +10,7 @@ import (
 	"context"
 	"testing"
 
-	. "pgregory.net/rapid"
+	. "github.com/flamingoosesoftwareinc/rapid"
 )
 
 func checkInt(t *T) {

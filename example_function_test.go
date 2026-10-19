@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"testing"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 // ParseDate parses dates in the YYYY-MM-DD format.
