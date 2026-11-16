@@ -34,7 +34,7 @@ const (
 	shrinkStepBound = 10 * time.Second // can be improved by taking average checkOnce runtime into account
 
 	tracebackLen  = 32
-	tracebackStop = "pgregory.net/rapid.checkOnce"
+	tracebackStop = "github.com/flamingoosesoftwareinc/rapid.checkOnce"
 	runtimePrefix = "runtime."
 )
 
@@ -42,8 +42,8 @@ var (
 	flags cmdline
 
 	tracebackBlacklist = map[string]bool{
-		"pgregory.net/rapid.(*customGen[...]).maybeValue.func1": true,
-		"pgregory.net/rapid.runAction.func1":                    true,
+		"github.com/flamingoosesoftwareinc/rapid.(*customGen[...]).maybeValue.func1": true,
+		"github.com/flamingoosesoftwareinc/rapid.runAction.func1":                    true,
 	}
 
 	// exampleMaxTries is the retry budget for [Generator.Example]. Each

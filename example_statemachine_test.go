@@ -9,7 +9,7 @@ package rapid_test
 import (
 	"testing"
 
-	"pgregory.net/rapid"
+	"github.com/flamingoosesoftwareinc/rapid"
 )
 
 // Queue implements integer queue with a fixed maximum size.
